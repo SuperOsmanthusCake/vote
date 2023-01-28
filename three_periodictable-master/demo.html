@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>three.js css3d - periodic table</title>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>投票元素周期表动画效果</title>
+  <link href="animate.min.css" rel="stylesheet" media="all">
+</head>
+
+<body>
+  <!-- 引入需要的文件 -->
+  <script src="jquery-1.8.2.min.js"></script>
+  <script src="three.min.js"></script>
+  <script src="tween.min.js"></script>
+  <script src="TrackballControls.js"></script>
+  <script src="CSS3DRenderer.js"></script>
+
+  <div id="container"></div>
+  <div class="music">
+    <audio id="music" src="./music.mp3" class="music-item" loop></audio>
+    <div id="musicBox" class="music-box" title="播放/暂停背景音乐">音乐</div>
+  </div>
+  <div id="menu">
+    <button id="table">表格</button>
+    <button id="helix">螺旋</button>
+    <button id="grid">网格</button>
+    <button id="pause">暂停</button>
+    <button id="add">重置</button>
+    <button id="remove">结果</button>
+    <button id="refresh" >刷新</button>
+  </div>
+
+  <div class="show_info animated" style="display: none;">
+    <div class="info_my">
+      <img src="touxiang.jpg">
+      <div class="info_mem">
+        <div class="nickname">降省心</div>
+        <div class="id">ID:082037</div>
+        <div class="vote">票数：99</div>
+      </div>
+    </div>
+    <div class="intro">你说世间什么最难得，徒手摘星， 爱而不得，世人万千， 再难遇我。</div>
+  </div>
+
+  <script>
+    // 最高票数队伍
+    var maxCount = '无'
+    // 名片添加位置
+    var CurPersonNum = [0,36,72,108];
+    // 开启动画
+    var threeStop = false;
+    // 速度
+    var speed = 0.004
+    // 判断结果是否公布 
+    var isremove = false
+    // 结束倒计时间
+    let down = 30
+    //动画约束
+    var _in = ['bounceIn', 'bounceInDown', 'bounceInLeft', 'bounceInRight', 'bounceInUp', 'fadeIn', 'fadeInDown', 'fadeInDownBig', 'fadeInLeft', 'fadeInLeftBig', 'fadeInRight', 'fadeInRightBig', 'fadeInUp', 'fadeInUpBig', 'rotateIn', 'rotateInDownLeft', 'rotateInDownRight', 'rotateInUpLeft', 'rotateInUpRight', 'slideInDown', 'slideInLeft', 'slideInRight'];
+    var _out = ['bounceOut', 'bounceOutDown', 'bounceOutLeft', 'bounceOutRight', 'bounceOutUp', 'fadeOut', 'fadeOutDown', 'fadeOutDownBig', 'fadeOutLeft', 'fadeOutLeftBig', 'fadeOutRight', 'fadeOutRightBig', 'fadeOutUp', 'fadeOutUpBig', 'rotateOut', 'rotateOutDownLeft', 'rotateOutDownRight', 'rotateOutUpLeft', 'rotateOutUpRight', 'slideOutDown', 'slideOutLeft', 'slideOutRight'];
+
+    var table = [
+    ];
+    for (var i = 0; i < 144; i++) {
+      table.push({
+        'name': i,
+        'p_x': i % 12 + 4,
+        'p_y': parseInt(i / 12) + 1,
+        'image': ''
+      })
+    }
+
+    var camera, scene, renderer;
+    var controls;
+    var objects = [];
+    var targets = { table: [], sphere: [], helix: [], grid: [] };
+
+    init();
+    animate();
+
+    /**
+     * 生成卡片
+     *
+     * @param info
+     */
+    function pushCard(info) {
+
+      var element = document.createElement('div');
+      element.className = 'element';
+      element.style.backgroundColor = 'rgba(240,101,1,' + (Math.random() * 0.5 + 0.25) + ')';
+
+      var symbol = document.createElement('div');
+      symbol.className = 'symbol';
+      element.appendChild(symbol);
+
+      var img = document.createElement('img');
+      img.src = info.image;
+      symbol.appendChild(img);
+      var details = document.createElement('div');
+      details.className = 'details';
+      details.innerHTML = '';
+      element.appendChild(details);
+      var object = new THREE.CSS3DObject(element);
+      object.position.x = Math.random() * 4000 - 2000;
+      object.position.y = Math.random() * 4000 - 2000;
+      object.position.z = Math.random() * 4000 - 2000;
+      scene.add(object);
+      objects.push(object);
+
+      //表格坐标进行排序
+      var object = new THREE.Object3D();
+      object.position.x = (info.p_x * 140) - 1330;
+      object.position.y = -(info.p_y * 180) + 990;
+      targets.table.push(object);
+      return objects;
+    }
+    /**
+     * 卡片初始化
+     */
+    function initCard(objects) {
+
+      // helix 渲染的算法
+      var vector = new THREE.Vector3();
+      for (var i = 0, l = objects.length; i < l; i++) {
+        var theta = i * 0.175 + Math.PI;
+        var y = -(i * 8) + 450;
+        var object = new THREE.Object3D();
+        object.position.setFromCylindricalCoords(900, theta, y);
+        vector.x = object.position.x * 2;
+        vector.y = object.position.y;
+        vector.z = object.position.z * 2;
+        object.lookAt(vector);
+        targets.helix.push(object);
+
+      }
+
+      // grid 渲染的算法
+      for (var i = 0; i < objects.length; i++) {
+        var object = new THREE.Object3D();
+        object.position.x = ((i % 6) * 400) - 800;
+        object.position.y = (-(Math.floor(i / 6) % 6) * 400) + 800;
+        object.position.z = (Math.floor(i / 36)) * 1000 - 2000;
+        targets.grid.push(object);
+
+      }
+    }
+
+    function init() {
+
+      camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 1, 10000);
+      camera.position.z = 3000;
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xff0000)
+      // table
+      for (var i = 0; i < table.length; i++) {
+        var objects = pushCard(table[i])
+      }
+      initCard(objects)
+
+      //渲染
+      renderer = new THREE.CSS3DRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.getElementById('container').appendChild(renderer.domElement);
+
+      //鼠标控制
+      controls = new THREE.TrackballControls(camera, renderer.domElement);
+      controls.rotateSpeed = 0.5;
+      controls.minDistance = 500;
+      controls.maxDistance = 6000;
+      controls.addEventListener('change', render);
+
+
+
+      var button = document.getElementById('table');
+      button.addEventListener('click', function () {
+        transform(targets.table, 2000);
+      }, false);
+
+      var button = document.getElementById('helix');
+      button.addEventListener('click', function () {
+        transform(targets.helix, 2000);
+      }, false);
+
+      var button = document.getElementById('grid');
+      button.addEventListener('click', function () {
+        transform(targets.grid, 2000);
+      }, false);
+
+      transform(targets.table, 2000);
+      window.addEventListener('resize', onWindowResize, false);
+    }
+
+    // 利用TWEEN自定义的一个动画渲染算法
+    function transform(targets, duration) {
+      TWEEN.removeAll();
+      for (var i = 0; i < objects.length; i++) {
+
+        var object = objects[i];
+        var target = targets[i];
+        new TWEEN.Tween(object.position)
+          .to({
+            x: target.position.x,
+            y: target.position.y,
+            z: target.position.z
+          }, Math.random() * duration + duration)
+          .easing(TWEEN.Easing.Exponential.InOut)
+          .start();
+
+        new TWEEN.Tween(object.rotation)
+          .to({
+            x: target.rotation.x,
+            y: target.rotation.y,
+            z: target.rotation.z
+          }, Math.random() * duration + duration)
+          .easing(TWEEN.Easing.Exponential.InOut)
+          .start();
+      }
+
+      new TWEEN.Tween(this)
+        .to({}, duration * 2)
+        .onUpdate(render)
+        .start();
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      render();
+    }
+
+    function animate() {
+      //scene.rotation.x += 0.009;
+      if (!threeStop) {
+        scene.rotation.y += speed;
+
+      }
+
+      //循环渲染
+      requestAnimationFrame(animate);
+      TWEEN.update();
+      controls.update();
+      render();
+    }
+
+    function render() {
+      renderer.render(scene, camera);
+    }
+
+    //动画暂停
+    $('#pause').click(function () {
+      threeStop = !threeStop;
+      animate()
+    })
+    $('#refresh').click(function () {
+      window.location.reload()
+    })
+
+    let onload = window.onload
+
+      window.onload = function () {
+        onload && onload()
+        let music = document.querySelector('#music')
+        let rotated = 0,
+          stopAnimate = false,
+          musicBox = document.querySelector('#musicBox')
+        function animate () {
+          requestAnimationFrame(function () {
+            if (stopAnimate) {
+              return
+            }
+            rotated = rotated % 360
+            musicBox.style.transform = 'rotate(' + rotated + 'deg)'
+            rotated += 1
+            animate()
+          })
+        }
+
+        musicBox.addEventListener(
+          'click',
+          function (e) {
+            if (music.paused) {
+              music.play().then(
+                () => {
+                  stopAnimate = false
+                  animate()
+                },
+                () => {
+                  addQipao('背景音乐自动播放失败，请手动播放！')
+                }
+              )
+            } else {
+              music.pause()
+              stopAnimate = true
+            }
+          },
+          false
+        )
+
+        setTimeout(function () {
+          musicBox.click()
+        }, 1000)
+      }
+
+  </script>
+  <script>
+    const ws = new WebSocket('ws://124.71.212.5:9001')
+    let id = null
+    let len = []
+    ws.onopen = da => {
+      ws.send('getJson')
+    }
+    let y = 0
+    ws.onmessage = (d) => {
+      y++
+      var da = d.data.split('.,')
+      // 用户
+      if (da.length > 1) {
+        var toup = JSON.parse(da[0])
+        // 队伍
+        var res = JSON.parse(da[1])
+      }
+      else {
+        if (JSON.parse(d.data).res == 'tostop') {
+          animote()
+        }
+      }
+      if (y == 1) {
+        toup.forEach(item => {
+          maxCount = getMax(res)
+          len.push(item.toup.length+0)
+            //console.log(5);
+            item.toup.forEach(id => {
+              
+              // get animate
+              if (CurPersonNum[id-1] >= table.length) {
+                alert('已达最高票数')
+                return
+              }
+              // 更改展示的图片
+                      // console.log(document.getElementsByClassName('element')[id]);
+              var img = document.getElementsByClassName('element')[CurPersonNum[id-1]].getElementsByTagName('img')[0];
+              document.getElementsByClassName('element')[CurPersonNum[id-1]].classList.add('element_hover')
+              document.getElementsByClassName('element')[CurPersonNum[id-1]].style.backgroundColor = res[id - 1].color
+              document.getElementsByClassName('element')[CurPersonNum[id-1]].style.opacity = 0.75
+              img.setAttribute('src', 'touxiang.jpg');
+              document.getElementsByClassName('element')[CurPersonNum[id-1]].getElementsByClassName('details')[0].innerHTML = res[id - 1].name
+              ++CurPersonNum[id-1];
+            })
+          
+        })
+      } else if (da.length > 1) {
+        toup.length>len.length?(len=[],toup.forEach(da=>{
+          len.push(da.toup.length+0)
+        })):console.log(len)
+        for (let s = 0; s < toup.length; s++) {
+          //console.log(toup[s].toup.length);
+         
+          if (toup[s].toup.length > len[s]) {
+          
+            id = toup[s].toup[toup[s].toup.length - 1]
+            len[s] = toup[s].toup.length
+            if (isremove) return
+            // get animate
+            if (CurPersonNum[id-1] >= table.length) {
+              alert('已达最高票数')
+              return
+            }
+            setTimeout(function () {
+              maxCount = getMax(res)
+      
+              // 更改展示的图片
+              var img = document.getElementsByClassName('element')[CurPersonNum[id-1]].getElementsByTagName('img')[0];
+              document.getElementsByClassName('element')[CurPersonNum[id-1]].classList.add('element_hover')
+              document.getElementsByClassName('element')[CurPersonNum[id-1]].style.backgroundColor = res[id - 1].color
+              img.setAttribute('src', 'touxiang.jpg');
+              document.getElementsByClassName('element')[CurPersonNum[id-1]].getElementsByClassName('details')[0].innerHTML = res[id - 1].name
+              document.getElementsByClassName('element')[CurPersonNum[id-1]].style.opacity = 0.75
+              ++CurPersonNum[id-1];
+            }, 300);
+          }
+        }
+      }
+      function getMax(res) {
+        let i = 0
+        let pioa = 0
+        var name = '计算错误' 
+        res.forEach(itme => {
+          if (itme.piao > pioa) {
+            pioa = itme.piao
+            i = itme.team - 1
+            name = res[i].name
+            console.log('1',name);
+          }else if(itme.piao === pioa){
+            name='有平票'
+            console.log('2', name);
+          }
+        })
+        console.log(name);
+        return name
+      }
+    }
+    //删除卡片
+    $('#remove').click(function () {
+      let mima = prompt('请输入管理员密码！')
+      if (mima !== '011002') return
+      ws.send('stop')
+
+      
+      // a.playbackRate = 1.2;//设置速度1/1.5/2
+    })
+    function animote() {
+            var a = document.getElementById("music")
+      a.pause();
+      a.src = './环太平洋.mp3'
+      a.play();
+      // 获取intro的dom
+      let intro = document.getElementsByClassName('intro')
+      intro[0].innerHTML = '最后倒计时30秒，请未投票的同事，投出您宝贵的一票'
+      // 修改旋转速度
+      speed = 0.1;
+      // 获取DOM
+      let remove = document.getElementById("remove")
+      // 修改文字
+      remove.style.display = 'none'
+      // 触发螺型
+      transform(targets.helix, 1000);
+      // 显示透明框
+      $('.show_info').show();
+      // 获取DOM
+      let info_my = document.getElementsByClassName("info_my")
+      // 清空上方的DOM
+      info_my[0].innerHTML = ''
+      // 创建dom
+      var p = document.createElement('p');
+      // 添加dom
+      info_my[0].appendChild(p)
+      // 添加数字倒计时
+      info_my[0].children[0].innerText = down
+      // 涉及倒计时
+      let terval = setInterval(function () {
+        down--
+        info_my[0].children[0].innerText = down
+        if (down === 0) {
+          info_my[0].children[0].innerText = maxCount
+          intro[0].innerHTML = '恭喜该队伍，为最后获胜方'
+          // 禁止其它操作 创建卡片
+          isremove = true
+          clearInterval(terval)
+        }
+      }, 1000)
+
+    }
+    //重置
+    $('#add').click(function () {
+      let mima = prompt('请输入管理员密码！')
+      if (mima !== '011002') return
+      ws.send('reset')
+      window.location.reload()
+    })
+  </script>
+</body>
+
+</html>
